@@ -1,19 +1,17 @@
 package socs.network.node;
 
+import socs.network.message.SOSPFPacket;
 import socs.network.util.Configuration;
 
-import java.io.BufferedReader;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
 public class Router {
+
+  public static final short HELLO_MESSAGE = 0;
+  public static final short LINK_STATE_UPDATE_MESSAGE = 1;
 
   protected LinkStateDatabase lsd;
 
@@ -114,6 +112,71 @@ public class Router {
    * broadcast Hello to neighbors
    */
   private void processStart() {
+
+    for (Link neighbor : ports){
+      SOSPFPacket message = new SOSPFPacket();
+
+      message.srcProcessIP = neighbor.router1.processIPAddress;
+      message.srcProcessPort = neighbor.router1.processPortNumber;
+      message.srcIP = neighbor.router1.simulatedIPAddress;
+      message.dstIP = neighbor.router2.simulatedIPAddress;
+
+      String destinationProcessIP = neighbor.router2.processIPAddress;
+      short destinationProcessPort = neighbor.router2.processPortNumber;
+
+      message.sospfType = HELLO_MESSAGE;
+      message.routerID = neighbor.router1.simulatedIPAddress;
+      message.neighborID = neighbor.router2.simulatedIPAddress;
+
+      try{
+        Socket newConnection = new Socket(destinationProcessIP, destinationProcessPort);
+        ObjectOutputStream outStream = new ObjectOutputStream(newConnection.getOutputStream());
+        ObjectInputStream inStream = new ObjectInputStream(newConnection.getInputStream());
+        outStream.writeObject(message);
+
+        Object acknowledgementMessageObject = new Object();
+
+        try{
+            acknowledgementMessageObject = inStream.readObject();
+            SOSPFPacket acknowledgementMessage;
+
+            if (acknowledgementMessageObject instanceof SOSPFPacket){
+                acknowledgementMessage = (SOSPFPacket) acknowledgementMessageObject;
+                if(acknowledgementMessage.sospfType == HELLO_MESSAGE){
+                    System.out.println("received HELLO from " + acknowledgementMessage.srcIP);
+                    neighbor.router1.status = RouterStatus.TWO_WAY;
+                    neighbor.router2.status = RouterStatus.TWO_WAY;
+                    System.out.println("Set " + acknowledgementMessage.srcIP + " to TWO WAY");
+
+                    outStream.writeObject(message);
+                    
+                }
+
+            }
+
+
+
+
+        }
+        catch (Exception e){
+
+        }
+
+
+        
+      } catch (IOException e){
+
+        System.out.println("Connection Refused!");
+
+      }
+
+
+
+
+
+
+
+    }
 	 
 
   }
