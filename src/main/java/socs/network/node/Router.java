@@ -4,7 +4,8 @@ import socs.network.util.Configuration;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 public class Router {
 
@@ -17,7 +18,17 @@ public class Router {
 
   public Router(Configuration config) {
     rd.simulatedIPAddress = config.getString("socs.network.router.ip");
+    rd.processPortNumber = config.getShort("socs.network.router.port");
     lsd = new LinkStateDatabase(rd);
+    
+    try {
+		rd.processIPAddress = InetAddress.getLocalHost().getHostAddress();
+	} catch (UnknownHostException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+		System.out.println("IP Address error. Please try again. Currently setting IP address to -1");
+		rd.processIPAddress="-1";
+	}
   }
 
   /**
@@ -50,7 +61,22 @@ public class Router {
    */
   private void processAttach(String processIP, short processPort,
                              String simulatedIP, short weight) {
+	  RouterDescription routerToConnect = new  RouterDescription();
+	  routerToConnect.processIPAddress=processIP;
+	  routerToConnect.processPortNumber=processPort;
+	  routerToConnect.simulatedIPAddress=simulatedIP;
+	  
+	  
 
+  }
+  
+  private int findFreePort(){
+	  for(int i =0; i<ports.length; i++){
+		  if (ports[i] !=null){
+			  return i;
+		  }
+	  }
+	  return -1;
   }
 
   /**
