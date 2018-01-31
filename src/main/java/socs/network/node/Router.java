@@ -3,8 +3,14 @@ package socs.network.node;
 import socs.network.util.Configuration;
 
 import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.Socket;
 import java.net.UnknownHostException;
 
 public class Router {
@@ -66,6 +72,31 @@ public class Router {
 	  routerToConnect.processPortNumber=processPort;
 	  routerToConnect.simulatedIPAddress=simulatedIP;
 	  
+	  int portNumber = findFreePort();
+	  if (portNumber == -1){
+		  System.out.println("Error! All ports in use");
+		  return;
+	  }
+	  
+	  ports[portNumber] = new Link(rd, routerToConnect);
+	  
+	  try {
+		Socket socket = new Socket(routerToConnect.processIPAddress, routerToConnect.processPortNumber);
+		OutputStream outToServer = socket.getOutputStream();
+		DataOutputStream out = new DataOutputStream(outToServer);
+		
+		InputStream inFromServer = socket.getInputStream();
+		DataInputStream in = new DataInputStream(inFromServer);
+		out.writeUTF("Attaching");
+		
+		
+	} catch (UnknownHostException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+	} catch (IOException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+	}
 	  
 
   }
