@@ -100,7 +100,7 @@ public class Router {
 //		System.out.println(">>");
 		return;
 	}
-      System.out.println("Router to connect validated!");
+      System.out.print("Router to connect validated!\n");
 	  ports[portNumber] = new Link(rd, routerToConnect);
 	  
 //
@@ -161,6 +161,7 @@ public class Router {
                                   neighbor.router1.status = RouterStatus.TWO_WAY;
                                   neighbor.router2.status = RouterStatus.TWO_WAY;
                                   System.out.println("Set " + acknowledgementMessage.srcIP + " to TWO WAY");
+//                                  lsd._store.put()
 
                                   outStream.writeObject(message);
                                   closeSockets(newConnection, outStream, inStream);
@@ -212,6 +213,13 @@ public class Router {
    * output the neighbors of the routers
    */
   private void processNeighbors() {
+      int i =1;
+      for (Link l : ports ){
+          if (l !=null){
+              System.out.println("IP Address of neighbor " + i + " is: "+ l.router2.simulatedIPAddress+". The router status is: "+ l.router2.status);
+              i++;
+          }
+      }
 
   }
 
