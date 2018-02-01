@@ -27,6 +27,8 @@ public class Router {
     
     try {
 		rd.processIPAddress = InetAddress.getLocalHost().getHostAddress();
+		System.out.println("Physical IP Address: "+  rd.processIPAddress);
+		System.out.println("Accepting Socket Connections on port: " + rd.processPortNumber);
 	} catch (UnknownHostException e) {
 		// TODO Auto-generated catch block
 		e.printStackTrace();
@@ -69,39 +71,46 @@ public class Router {
 	  routerToConnect.processIPAddress=processIP;
 	  routerToConnect.processPortNumber=processPort;
 	  routerToConnect.simulatedIPAddress=simulatedIP;
+
+	  for (Link l : ports){
+	      if (l !=null) {
+              if (l.router2.simulatedIPAddress.equals(simulatedIP)) {
+                  System.out.println("Router already attached!");
+                  return;
+              }
+          }
+      }
 	  
 	  int portNumber = findFreePort();
 	  if (portNumber == -1){
 		  System.out.println("Error! All ports in use");
 		  return;
 	  }
-	  
+      try {
+		Socket socket = new Socket(routerToConnect.processIPAddress, routerToConnect.processPortNumber);
+		System.out.println("Validating Attachment");
+		socket.close();
+
+
+
+	} catch (Exception e) {
+
+		System.err.println("Cannot connect to given port/address. Please try again.");
+		System.out.println("");
+//		System.out.println(">>");
+		return;
+	}
+      System.out.println("Router to connect validated!");
 	  ports[portNumber] = new Link(rd, routerToConnect);
 	  
-	  try {
-		Socket socket = new Socket(routerToConnect.processIPAddress, routerToConnect.processPortNumber);
-		OutputStream outToServer = socket.getOutputStream();
-		DataOutputStream out = new DataOutputStream(outToServer);
-		
-		InputStream inFromServer = socket.getInputStream();
-		DataInputStream in = new DataInputStream(inFromServer);
-		out.writeUTF("Attaching");
-		
-		
-	} catch (UnknownHostException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	} catch (IOException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	}
+//
 	  
 
   }
   
-  private int findFreePort(){
+  protected int findFreePort(){
 	  for(int i =0; i<ports.length; i++){
-		  if (ports[i] !=null){
+		  if (ports[i] ==null){
 			  return i;
 		  }
 	  }
@@ -113,71 +122,77 @@ public class Router {
    */
   private void processStart() {
 
-    for (Link neighbor : ports){
-      SOSPFPacket message = new SOSPFPacket();
-
-      message.srcProcessIP = neighbor.router1.processIPAddress;
-      message.srcProcessPort = neighbor.router1.processPortNumber;
-      message.srcIP = neighbor.router1.simulatedIPAddress;
-      message.dstIP = neighbor.router2.simulatedIPAddress;
-
-      String destinationProcessIP = neighbor.router2.processIPAddress;
-      short destinationProcessPort = neighbor.router2.processPortNumber;
-
-      message.sospfType = HELLO_MESSAGE;
-      message.routerID = neighbor.router1.simulatedIPAddress;
-      message.neighborID = neighbor.router2.simulatedIPAddress;
-
-      try{
-        Socket newConnection = new Socket(destinationProcessIP, destinationProcessPort);
-        ObjectOutputStream outStream = new ObjectOutputStream(newConnection.getOutputStream());
-        ObjectInputStream inStream = new ObjectInputStream(newConnection.getInputStream());
-        outStream.writeObject(message);
-
-        Object acknowledgementMessageObject = new Object();
-
-        try{
-            acknowledgementMessageObject = inStream.readObject();
-            SOSPFPacket acknowledgementMessage;
-
-            if (acknowledgementMessageObject instanceof SOSPFPacket){
-                acknowledgementMessage = (SOSPFPacket) acknowledgementMessageObject;
-                if(acknowledgementMessage.sospfType == HELLO_MESSAGE){
-                    System.out.println("received HELLO from " + acknowledgementMessage.srcIP);
-                    neighbor.router1.status = RouterStatus.TWO_WAY;
-                    neighbor.router2.status = RouterStatus.TWO_WAY;
-                    System.out.println("Set " + acknowledgementMessage.srcIP + " to TWO WAY");
-
-                    outStream.writeObject(message);
-                    
-                }
-
-            }
+      for (Link neighbor : ports) {
+          if (neighbor != null) {
+              if (neighbor.router2.status == null) {
+                  SOSPFPacket message = new SOSPFPacket();
 
 
+                  message.srcProcessIP = neighbor.router1.processIPAddress;
+                  message.srcProcessPort = neighbor.router1.processPortNumber;
+                  message.srcIP = neighbor.router1.simulatedIPAddress;
+                  message.dstIP = neighbor.router2.simulatedIPAddress;
+
+                  String destinationProcessIP = neighbor.router2.processIPAddress;
+                  short destinationProcessPort = neighbor.router2.processPortNumber;
+                  System.out.println("DestinationProcessIP: " + destinationProcessIP);
+                  System.out.println("DestinationProcessPort: " + destinationProcessPort);
+
+                  message.sospfType = HELLO_MESSAGE;
+                  message.routerID = neighbor.router1.simulatedIPAddress;
+                  message.neighborID = neighbor.router2.simulatedIPAddress;
+
+                  try {
+                      Socket newConnection = new Socket(destinationProcessIP, destinationProcessPort);
+                      ObjectOutputStream outStream = new ObjectOutputStream(newConnection.getOutputStream());
+                      ObjectInputStream inStream = new ObjectInputStream(newConnection.getInputStream());
+                      outStream.writeObject(message);
+
+                      Object acknowledgementMessageObject;
+
+                      try {
+                          acknowledgementMessageObject = inStream.readObject();
+                          SOSPFPacket acknowledgementMessage;
+
+                          if (acknowledgementMessageObject instanceof SOSPFPacket) {
+                              acknowledgementMessage = (SOSPFPacket) acknowledgementMessageObject;
+                              if (acknowledgementMessage.sospfType == HELLO_MESSAGE) {
+                                  System.out.println("received HELLO from " + acknowledgementMessage.srcIP);
+                                  neighbor.router1.status = RouterStatus.TWO_WAY;
+                                  neighbor.router2.status = RouterStatus.TWO_WAY;
+                                  System.out.println("Set " + acknowledgementMessage.srcIP + " to TWO WAY");
+
+                                  outStream.writeObject(message);
+                                  closeSockets(newConnection, outStream, inStream);
+
+                              }
+
+                          }
 
 
-        }
-        catch (Exception e){
+                      } catch (Exception e) {
+                          System.out.println("Danger");
+                      }
 
-        }
+
+                  } catch (IOException e) {
+                      e.printStackTrace();
+
+                      System.out.println("Connection Refused!");
+
+                  }
 
 
-        
-      } catch (IOException e){
+              }
 
-        System.out.println("Connection Refused!");
-
+          }
       }
+  }
 
-
-
-
-
-
-
-    }
-	 
+  private void closeSockets(Socket tempClientSocket, ObjectOutputStream outStream, ObjectInputStream inputStream) throws IOException{
+      if (inputStream!=null) inputStream.close();
+      if (outStream!=null) outStream.close();
+      tempClientSocket.close();
 
   }
 
