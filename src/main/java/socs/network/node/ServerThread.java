@@ -25,16 +25,16 @@ public class ServerThread implements Runnable {
     public void run(){
 //        System.out.println("Port Number: " + portNumber);
         try {
-            ServerSocket serverSocket = new ServerSocket(portNumber);
+            ServerSocket serverSocket = new ServerSocket(portNumber); // create new socket to accept requests on
 
-            ExecutorService threadPool  = Executors.newCachedThreadPool();
+            ExecutorService threadPool  = Executors.newCachedThreadPool(); // dynamic thread pool to spin off requests into their own thread
 
             while(1==1){
 
                 Socket incomingMessagesSocket = serverSocket.accept();
-                ServerTaskThread handleRequest = new ServerTaskThread(r,incomingMessagesSocket);
+                ServerTaskThread handleRequest = new ServerTaskThread(r,incomingMessagesSocket); // create new serever task handler instance
 
-                threadPool.submit(handleRequest);
+                threadPool.submit(handleRequest); //pass server task thread object into dynamic thread pool
 
             }
 

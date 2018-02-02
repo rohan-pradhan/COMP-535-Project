@@ -1,12 +1,16 @@
 package socs.network.node;
 
+import socs.network.message.LSA;
+import socs.network.message.LinkDescription;
 import socs.network.message.SOSPFPacket;
 import socs.network.util.Configuration;
 
 import java.io.*;
 import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.LinkedList;
 
 public class Router {
 
@@ -27,14 +31,16 @@ public class Router {
     
     try {
 		rd.processIPAddress = InetAddress.getLocalHost().getHostAddress();
-		System.out.println("Physical IP Address: "+  rd.processIPAddress);
-		System.out.println("Accepting Socket Connections on port: " + rd.processPortNumber);
+		System.out.println("Physical IP Address: "+  rd.processIPAddress); //For Display
+		System.out.println("Accepting Socket Connections on port: " + rd.processPortNumber); //For display
 	} catch (UnknownHostException e) {
 		// TODO Auto-generated catch block
 		e.printStackTrace();
 		System.out.println("IP Address error. Please try again. Currently setting IP address to -1");
 		rd.processIPAddress="-1";
 	}
+
+
   }
 
   /**
@@ -72,7 +78,7 @@ public class Router {
 	  routerToConnect.processPortNumber=processPort;
 	  routerToConnect.simulatedIPAddress=simulatedIP;
 
-	  for (Link l : ports){
+	  for (Link l : ports){ // ensures you are not trying to attach a router that is already attached
 	      if (l !=null) {
               if (l.router2.simulatedIPAddress.equals(simulatedIP)) {
                   System.out.println("Router already attached!");
@@ -82,32 +88,33 @@ public class Router {
       }
 	  
 	  int portNumber = findFreePort();
-	  if (portNumber == -1){
+	  if (portNumber == -1){ //no ports are left
 		  System.out.println("Error! All ports in use");
 		  return;
 	  }
       try {
-		Socket socket = new Socket(routerToConnect.processIPAddress, routerToConnect.processPortNumber);
+		Socket socket = new Socket(routerToConnect.processIPAddress, routerToConnect.processPortNumber); //validating that the entered IP address is connectable
 		System.out.println("Validating Attachment");
 		socket.close();
 
 
 
-	} catch (Exception e) {
+	} catch (Exception e) { //wrong combination of ip address or port try again
 
 		System.err.println("Cannot connect to given port/address. Please try again.");
 		System.out.println("");
 //		System.out.println(">>");
 		return;
 	}
-      System.out.print("Router to connect validated!\n");
-	  ports[portNumber] = new Link(rd, routerToConnect);
+      System.out.println("Router to connect validated!");
+	  ports[portNumber] = new Link(rd, routerToConnect); //adds to link  router
 	  
 //
 	  
 
   }
-  
+  // finds the next free port in the link array
+    // returns -1 if no ports are found
   protected int findFreePort(){
 	  for(int i =0; i<ports.length; i++){
 		  if (ports[i] ==null){
@@ -122,9 +129,9 @@ public class Router {
    */
   private void processStart() {
 
-      for (Link neighbor : ports) {
+      for (Link neighbor : ports) { // loops through all neighbors in link array to ensure start message is brodcast to everyone
           if (neighbor != null) {
-              if (neighbor.router2.status == null) {
+              if (neighbor.router2.status == null) { // if neighbor has not already had start called on it run the start process
                   SOSPFPacket message = new SOSPFPacket();
 
 
@@ -142,11 +149,12 @@ public class Router {
                   message.routerID = neighbor.router1.simulatedIPAddress;
                   message.neighborID = neighbor.router2.simulatedIPAddress;
 
+
                   try {
                       Socket newConnection = new Socket(destinationProcessIP, destinationProcessPort);
                       ObjectOutputStream outStream = new ObjectOutputStream(newConnection.getOutputStream());
                       ObjectInputStream inStream = new ObjectInputStream(newConnection.getInputStream());
-                      outStream.writeObject(message);
+                      outStream.writeObject(message); // send the first hello message
 
                       Object acknowledgementMessageObject;
 
@@ -154,17 +162,41 @@ public class Router {
                           acknowledgementMessageObject = inStream.readObject();
                           SOSPFPacket acknowledgementMessage;
 
-                          if (acknowledgementMessageObject instanceof SOSPFPacket) {
+                          if (acknowledgementMessageObject instanceof SOSPFPacket) { //ensure receiving message is not corrupted
                               acknowledgementMessage = (SOSPFPacket) acknowledgementMessageObject;
-                              if (acknowledgementMessage.sospfType == HELLO_MESSAGE) {
+                              if (acknowledgementMessage.sospfType == HELLO_MESSAGE) { //if receiving messge is hello message
                                   System.out.println("received HELLO from " + acknowledgementMessage.srcIP);
                                   neighbor.router1.status = RouterStatus.TWO_WAY;
-                                  neighbor.router2.status = RouterStatus.TWO_WAY;
+                                  neighbor.router2.status = RouterStatus.TWO_WAY; //set both routers to two way in the link array
                                   System.out.println("Set " + acknowledgementMessage.srcIP + " to TWO WAY");
 //                                  lsd._store.put()
 
-                                  outStream.writeObject(message);
-                                  closeSockets(newConnection, outStream, inStream);
+                                  outStream.writeObject(message); //write acknowledgement message
+                                  closeSockets(newConnection, outStream, inStream); //close sockets
+                                  LSA lsa = new LSA(); // new LSA
+                                  lsa.linkStateID = rd.simulatedIPAddress;
+                                  if (lsd._store.get(rd.simulatedIPAddress).lsaSeqNumber == Integer.MIN_VALUE){
+                                      lsa.lsaSeqNumber =0; // new sequence
+                                  } else {
+                                      lsa.lsaSeqNumber = lsd._store.get(rd.simulatedIPAddress).lsaSeqNumber +1; //add to old sequence
+                                  }
+
+                                  LinkedList<LinkDescription> linkList = new LinkedList<LinkDescription>();
+                                  for (Link l : ports){ // create linked list of link list descriptions
+                                      if (l !=null){
+                                          if (l.router2.status !=null){
+                                              LinkDescription temp = new LinkDescription();
+                                              temp.portNum = l.router2.processPortNumber;
+                                              temp.linkID = l.router2.simulatedIPAddress;
+                                              linkList.add(temp);
+                                          }
+                                      }
+                                  }
+
+                                  lsa.links = linkList; //set link list to lsa link list
+                                  lsd._store.put(lsa.linkStateID,lsa); //update link state database with new link state advertisement
+
+
 
                               }
 
@@ -189,6 +221,8 @@ public class Router {
           }
       }
   }
+
+  //closes all sockets
 
   private void closeSockets(Socket tempClientSocket, ObjectOutputStream outStream, ObjectInputStream inputStream) throws IOException{
       if (inputStream!=null) inputStream.close();

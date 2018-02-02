@@ -26,6 +26,7 @@ public class ServerTaskThread implements Runnable {
     public void run(){
 
         try{
+            //create stream to read and write from
             OutputStream outputStream = inputSocket.getOutputStream();
             ObjectOutputStream objectOutput = new ObjectOutputStream(outputStream);
 
@@ -35,12 +36,12 @@ public class ServerTaskThread implements Runnable {
             Object newRequestObject = objectInput.readObject();
             SOSPFPacket newRequestMessage;
 
-            if (newRequestObject instanceof SOSPFPacket){
+            if (newRequestObject instanceof SOSPFPacket){//validate that object being read in is not corrupted and is of type SOSPFPacket
                 newRequestMessage = (SOSPFPacket) newRequestObject;
 
-                if(newRequestMessage.sospfType == HELLO_MESSAGE){
+                if(newRequestMessage.sospfType == HELLO_MESSAGE){ //ensure message being received is of hello message
 
-                    if (checkNoDuplicateIP(newRequestMessage.srcIP)){
+                    if (checkNoDuplicateIP(newRequestMessage.srcIP)){ //ensure that message is not already inside link array of router
                         portNumber = r.findFreePort();
                         RouterDescription routerToConnect = new RouterDescription();
                         routerToConnect.simulatedIPAddress = newRequestMessage.srcIP;
@@ -50,11 +51,12 @@ public class ServerTaskThread implements Runnable {
                         r.ports[portNumber] = toAdd;
                     }
                     System.out.println("");
+                    //print to console
                     System.out.println("received HELLO from " + newRequestMessage.srcIP);
                     changeRouterStatus(RouterStatus.INIT);
                     System.out.println("set " + newRequestMessage.srcIP + " state to INIT");
 
-                    SOSPFPacket message = new SOSPFPacket();
+                    SOSPFPacket message = new SOSPFPacket(); //create message to send acknowledgemtn of receipt of original message
                     message.srcProcessIP = r.rd.processIPAddress;
                     message.srcProcessPort = r.rd.processPortNumber;
                     message.srcIP = r.rd.simulatedIPAddress;
@@ -65,12 +67,12 @@ public class ServerTaskThread implements Runnable {
                     message.routerID = r.rd.simulatedIPAddress;
                     message.neighborID = r.ports[portNumber].router2.simulatedIPAddress;
 
-                    objectOutput.writeObject(message);
+                    objectOutput.writeObject(message); //send message acknowledgemnt
 
                     Object confirmationObject = objectInput.readObject();
-                    SOSPFPacket confirmationMessage = (SOSPFPacket) confirmationObject;
+                    SOSPFPacket confirmationMessage = (SOSPFPacket) confirmationObject; //wait for acknowledgement that original router received your message
 
-                    if (confirmationMessage.sospfType == HELLO_MESSAGE){
+                    if (confirmationMessage.sospfType == HELLO_MESSAGE){ // if message is hello set router communication to two way and close sockets
                         System.out.println("received HELLO from " + confirmationMessage.srcIP);
                         changeRouterStatus(RouterStatus.TWO_WAY);
                         System.out.println("set " + confirmationMessage.srcIP + " state to TWO_WAY");
@@ -105,7 +107,7 @@ public class ServerTaskThread implements Runnable {
 
     }
 
-    public boolean checkNoDuplicateIP(String ip){
+    public boolean checkNoDuplicateIP(String ip){ //checks if there is no router with dupliate simulated IP to prevent multiple links with same router
         for (Link l : r.ports){
             if (l!=null){
                 if (l.router2.simulatedIPAddress.equalsIgnoreCase(ip)){
@@ -116,7 +118,7 @@ public class ServerTaskThread implements Runnable {
         return true;
     }
 
-    public void changeRouterStatus(RouterStatus status){
+    public void changeRouterStatus(RouterStatus status){ // changes both routhers in link array to status passed in
         r.ports[portNumber].router1.status = status;
         r.ports[portNumber].router2.status = status;
 
