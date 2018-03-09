@@ -1,5 +1,6 @@
 package socs.network.node;
 
+import socs.network.message.LSA;
 import socs.network.message.SOSPFPacket;
 
 import java.io.*;
@@ -93,7 +94,25 @@ public class ServerTaskThread implements Runnable {
 
 
 
+                } else if (newRequestMessage.sospfType == LINK_STATE_UPDATE_MESSAGE){
+                    LSA oldLSARequest = r.lsd._store.get(newRequestMessage.srcIP);
+                    if (checkLSAUpdateSequenceNumber(newRequestMessage.lsaArray.lastElement(), oldLSARequest)){
+                        r.lsd._store.put(newRequestMessage.srcIP, newRequestMessage.lsaArray.lastElement());
+
+                        r.processUpdate(newRequestMessage, newRequestMessage.srcIP);
+                    }
+                    else {
+                        System.err.println("Error!");
+                    }
+
+
+
+
                 }
+                else {
+                    System.err.println("Error!");
+                }
+
 
             }
 
@@ -102,9 +121,19 @@ public class ServerTaskThread implements Runnable {
 
 
         } catch (Exception e) {
+            System.err.println("Error!");
+
 
         }
 
+    }
+
+    public boolean checkLSAUpdateSequenceNumber(LSA newLSA, LSA oldLSA){
+        if (oldLSA == null || newLSA.lsaSeqNumber > oldLSA.lsaSeqNumber){
+            return true;
+        } else{
+            return false;
+        }
     }
 
     public boolean checkNoDuplicateIP(String ip){ //checks if there is no router with dupliate simulated IP to prevent multiple links with same router

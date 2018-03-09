@@ -222,6 +222,80 @@ public class Router {
       }
   }
 
+  protected void processUpdate(SOSPFPacket packetToForward, String IP_exception) throws IOException{
+      if (packetToForward==null){
+
+          LSA lsa = new LSA(); // new LSA
+          lsa.linkStateID = rd.simulatedIPAddress;
+          if (lsd._store.get(rd.simulatedIPAddress).lsaSeqNumber == Integer.MIN_VALUE){
+              lsa.lsaSeqNumber =0; // new sequence
+          } else {
+              lsa.lsaSeqNumber = lsd._store.get(rd.simulatedIPAddress).lsaSeqNumber +1; //add to old sequence
+          }
+
+          LinkedList<LinkDescription> linkList = new LinkedList<LinkDescription>();
+          for (Link l : ports){ // create linked list of link list descriptions
+              if (l !=null || !l.router2.simulatedIPAddress.equalsIgnoreCase(IP_exception)){
+                  if (l.router2.status !=null){
+                      LinkDescription temp = new LinkDescription();
+                      temp.portNum = l.router2.processPortNumber;
+                      temp.linkID = l.router2.simulatedIPAddress;
+                      linkList.add(temp);
+                  }
+              }
+          }
+
+          lsa.links = linkList; //set link list to lsa link list
+          lsd._store.put(lsa.linkStateID,lsa); //update link state database with new link state advertisement
+
+          for (Link l : ports){
+              if (l!=null || !l.router2.simulatedIPAddress.equalsIgnoreCase(IP_exception)){
+                  Socket socket = new Socket(l.router2.processIPAddress,l.router2.processPortNumber);
+                  ObjectOutputStream ouputStream = new ObjectOutputStream(socket.getOutputStream());
+
+                  SOSPFPacket message = new SOSPFPacket();
+
+
+                  message.srcProcessIP = l.router1.processIPAddress;
+                  message.srcProcessPort = l.router1.processPortNumber;
+                  message.srcIP = l.router1.simulatedIPAddress;
+                  message.dstIP = l.router2.simulatedIPAddress;
+
+                  String destinationProcessIP = l.router2.processIPAddress;
+                  short destinationProcessPort = l.router2.processPortNumber;
+                  System.out.println("DestinationProcessIP: " + destinationProcessIP);
+                  System.out.println("DestinationProcessPort: " + destinationProcessPort);
+
+                  message.sospfType = LINK_STATE_UPDATE_MESSAGE;
+                  message.routerID = l.router1.simulatedIPAddress;
+                  message.neighborID = l.router2.simulatedIPAddress;
+
+                  ouputStream.writeObject(message);
+
+                  closeSockets(socket,ouputStream,null);
+
+
+
+
+              }
+          }
+
+      } else {
+
+        LSA lsa = packetToForward.lsaArray.lastElement();
+
+        for(Link l : ports){
+            if (l!=null){
+                Socket socket = new Socket(l.router2.processIPAddress,l.router2.processPortNumber);
+                ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
+                outputStream.writeObject(packetToForward);
+                closeSockets(socket,outputStream, null);
+            }
+        }
+
+      }
+  }
+
   //closes all sockets
 
   private void closeSockets(Socket tempClientSocket, ObjectOutputStream outStream, ObjectInputStream inputStream) throws IOException{
@@ -240,6 +314,9 @@ public class Router {
    */
   private void processConnect(String processIP, short processPort,
                               String simulatedIP, short weight) {
+
+
+
 
   }
 
